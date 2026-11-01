@@ -7,4 +7,6 @@ Set-Location -LiteralPath $resolvedBackend
 if (-not (Test-Path -LiteralPath ".venv\Scripts\python.exe")) {
   throw "Backend virtual environment is missing. Create it with: py -3.12 -m venv .venv"
 }
+
+Write-Host "Starting FaceFinder Backend (API + Worker combined)..." -ForegroundColor Cyan
 & .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000

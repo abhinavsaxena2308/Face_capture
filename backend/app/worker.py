@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import threading
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,9 +16,12 @@ from app.services.matching import cosine_scores
 from app.services.storage import StorageService
 from app.services.vision import VisionService
 
-
+logger = logging.getLogger("face_finder.worker")
 settings = get_settings()
 storage = StorageService(settings)
+
+_worker_thread: threading.Thread | None = None
+_worker_stop_event = threading.Event()
 
 
 def utcnow() -> datetime:
@@ -181,18 +186,54 @@ def process_search(search_id: uuid.UUID, vision: VisionService) -> None:
             session.commit()
 
 
-def run() -> None:
+def worker_loop(stop_event: threading.Event | None = None) -> None:
     settings.ensure_directories()
     ensure_schema()
     vision = VisionService(settings)
-    while True:
-        with SessionLocal() as session:
-            requeue_stale_jobs(session)
-            search_id = claim_next_search(session)
-        if search_id:
-            process_search(search_id, vision)
-        else:
-            time.sleep(settings.worker_poll_seconds)
+    logger.info("Worker loop started.")
+    while stop_event is None or not stop_event.is_set():
+        try:
+            with SessionLocal() as session:
+                requeue_stale_jobs(session)
+                search_id = claim_next_search(session)
+            if search_id:
+                process_search(search_id, vision)
+            else:
+                if stop_event:
+                    stop_event.wait(timeout=settings.worker_poll_seconds)
+                else:
+                    time.sleep(settings.worker_poll_seconds)
+        except Exception as e:
+            logger.error("Error in worker loop: %s", e)
+            if stop_event:
+                stop_event.wait(timeout=settings.worker_poll_seconds)
+            else:
+                time.sleep(settings.worker_poll_seconds)
+
+
+def start_worker_thread() -> threading.Event:
+    global _worker_thread, _worker_stop_event
+    if _worker_thread is not None and _worker_thread.is_alive():
+        return _worker_stop_event
+    _worker_stop_event.clear()
+    _worker_thread = threading.Thread(target=worker_loop, args=(_worker_stop_event,), daemon=True)
+    _worker_thread.name = "BackgroundFaceWorker"
+    _worker_thread.start()
+    logger.info("Background face worker thread started.")
+    return _worker_stop_event
+
+
+def stop_worker_thread() -> None:
+    global _worker_thread, _worker_stop_event
+    if _worker_thread is not None:
+        _worker_stop_event.set()
+        _worker_thread.join(timeout=3)
+        _worker_thread = None
+        logger.info("Background face worker thread stopped.")
+
+
+def run() -> None:
+    worker_loop()
 
 
 if __name__ == "__main__":

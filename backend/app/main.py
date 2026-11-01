@@ -28,7 +28,14 @@ async def lifespan(app: FastAPI):
     ensure_schema()
     app.state.storage = StorageService(settings)
     app.state.vision = None
+
+    # Automatically run worker in background alongside the API server
+    from app.worker import start_worker_thread, stop_worker_thread
+    start_worker_thread()
+
     yield
+
+    stop_worker_thread()
 
 
 app = FastAPI(title="Face Finder API", version="0.1.0", lifespan=lifespan)
