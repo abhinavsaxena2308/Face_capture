@@ -1,0 +1,3 @@
+[console_scripts]
+face-finder-api = app.main:run
+face-finder-worker = app.worker:run

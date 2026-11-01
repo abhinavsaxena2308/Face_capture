@@ -1,0 +1,112 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="#search" aria-label="Face Finder home" (click)="navigate('Search')">
+      <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
+      <span>frame<span class="brand-dot">.</span></span>
+    </a>
+    <div class="workspace-label">WORKSPACE</div>
+    <button class="workspace-switcher" (click)="toggleWorkspaceMenu()" [attr.aria-expanded]="workspaceMenuOpen()"><span class="workspace-avatar">P</span><span class="workspace-copy"><strong>Personal library</strong><small>Private workspace</small></span><span class="chevron">⌄</span></button>
+    @if (workspaceMenuOpen()) {
+      <div class="sidebar-popover"><strong>Personal library</strong><p>This is your private, on-device workspace. Face Finder currently supports one local workspace.</p><span>Data folder: configured on this computer</span></div>
+    }
+    <nav class="main-nav" aria-label="Main navigation">
+      <button class="nav-item" [class.active]="activeSection() === 'Search'" [attr.aria-current]="activeSection() === 'Search' ? 'page' : null" (click)="navigate('Search')"><span class="nav-icon search-icon">⌕</span>Search photos</button>
+      <button class="nav-item" [class.active]="activeSection() === 'Collections'" [attr.aria-current]="activeSection() === 'Collections' ? 'page' : null" (click)="navigate('Collections')"><span class="nav-icon">▤</span>Collections</button>
+      <button class="nav-item" [class.active]="activeSection() === 'Activity'" [attr.aria-current]="activeSection() === 'Activity' ? 'page' : null" (click)="navigate('Activity')"><span class="nav-icon">◷</span>Recent activity</button>
+    </nav>
+    <div class="sidebar-spacer"></div>
+    <div class="privacy-card"><span class="privacy-symbol">✳</span><div><strong>Your photos stay yours</strong><p>Scans run only through your local workspace.</p></div></div>
+    @if (profileMenuOpen()) {
+      <div class="sidebar-popover profile-popover"><strong>Local user</strong><p>This personal app runs on this computer. It does not have accounts or a cloud plan.</p><button (click)="navigate('Activity')">View recent activity</button></div>
+    }
+    <button class="profile" (click)="toggleProfileMenu()" [attr.aria-expanded]="profileMenuOpen()"><span class="profile-avatar">L</span><span class="profile-copy"><strong>Local user</strong><small>This device</small></span><span class="more">···</span></button>
+  </aside>
+
+  <main class="main-content" id="search">
+    <header class="topbar"><div class="breadcrumbs"><span>Workspace</span><b>/</b><strong>{{ activeSection() }}</strong></div><div class="top-actions"><span class="local-badge"><i></i> LOCAL WORKSPACE</span><button class="help-button" aria-label="Help" (click)="toggleHelp()" [attr.aria-expanded]="helpOpen()">?</button></div></header>
+    <div class="page-wrap">
+      @if (helpOpen()) {
+        <aside class="help-panel"><button class="help-close" aria-label="Close help" (click)="toggleHelp()">×</button><strong>Using Face Finder</strong><p>Select one reference photo and a folder of images. Uploads and face matching stay on this computer. Review possible matches before saving or deleting a search.</p></aside>
+      }
+      @if (activeSection() === 'Search') {
+      <section class="page-heading">
+        <div><div class="eyebrow"><span class="eyebrow-line"></span>YOUR PERSONAL PHOTO SEARCH</div><h1>Find your face<br><span>in every frame.</span></h1><p class="intro">Choose a face and a photo collection. Your browser sends files only to the scanner running on this computer.</p></div>
+        <div class="heading-art" aria-hidden="true"><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div><div class="art-face"><span class="art-eye left"></span><span class="art-eye right"></span><span class="art-nose"></span><span class="art-mouth"></span></div><span class="art-spark spark-a">✳</span><span class="art-spark spark-b">✳</span></div>
+      </section>
+
+      @if (view() === 'setup') {
+        <section class="workflow" aria-label="Search setup">
+          <div class="stepper"><div class="step active-step"><span class="step-number">01</span><span>Set up search</span></div><span class="step-rule"></span><div class="step"><span class="step-number">02</span><span>Review matches</span></div><span class="step-rule"></span><div class="step"><span class="step-number">03</span><span>Save collection</span></div></div>
+          <div class="setup-grid">
+            <section class="setup-card reference-card">
+              <div class="card-top"><div class="card-index">01</div><div><h2>Choose a reference face</h2><p>Use one clear photo where the face is easy to see.</p></div><button class="info" aria-label="Reference image help">i</button></div>
+              @if (referenceUrl(); as imageUrl) {
+                <div class="reference-preview"><img [src]="imageUrl" alt="Selected reference face"><div class="preview-overlay"><span class="check-mark">✓</span><span><strong>Reference ready</strong><small>{{ referenceFile()?.name }}</small></span><button class="remove-button" (click)="clearReference()" aria-label="Remove reference photo">×</button></div></div>
+              } @else {
+                <button class="dropzone reference-drop" (click)="openReferencePicker()" (keydown.enter)="openReferencePicker()" (dragover)="$event.preventDefault()" (drop)="$event.preventDefault(); onReferenceDrop($event)"><span class="upload-icon"><span>↑</span></span><strong>Drop a photo here</strong><span>or <em>browse files</em></span><small>JPG, PNG, WEBP, HEIC · up to 20 MB</small></button>
+              }
+              <input #referenceInput class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" (change)="onReferenceChange($event)">
+              <div class="tip-row"><span>✦</span>For best results, use a front-facing, well-lit photo.</div>
+            </section>
+            <section class="setup-card collection-card">
+              <div class="card-top"><div class="card-index">02</div><div><h2>Select your photo collection</h2><p>Choose a folder with the images you want to search.</p></div><button class="info" aria-label="Collection help">i</button></div>
+              @if (photoCount() > 0) {
+                <div class="collection-selected"><span class="folder-icon">▰</span><div class="selected-copy"><strong>Photo collection selected</strong><span>{{ photoCount() | number }} images · {{ sizeLabel }}</span></div><button class="remove-button dark-remove" (click)="clearFolder()" aria-label="Clear selected folder">×</button></div>
+                <div class="folder-note"><span class="mini-check">✓</span>Folder paths are preserved with every upload batch</div><button class="secondary-button change-folder" (click)="openFolderPicker()">Choose a different folder</button>
+              } @else {
+                <button class="dropzone folder-drop" (click)="openFolderPicker()" (keydown.enter)="openFolderPicker()" (dragover)="$event.preventDefault()" (drop)="$event.preventDefault(); onCollectionDrop($event)"><span class="folder-illustration"><span>▱</span><i>＋</i></span><strong>Drop a folder of photos</strong><span>or <em>choose a folder</em></span><small>Local scans support 10,000+ images</small></button>
+              }
+              <input #folderInput class="visually-hidden" type="file" multiple accept="image/*,.heic,.heif" webkitdirectory directory (change)="onFolderChange($event)">
+              <div class="tip-row"><span>▧</span>Originals are removed after scanning; matched copies are retained.</div>
+            </section>
+          </div>
+          <section class="options-card"><div class="option-copy"><span class="option-icon">⌁</span><div><strong>Match sensitivity</strong><p>Use a preset calibrated for the selected face model.</p></div></div><div class="sensitivity-options"><button [class.selected]="sensitivity() === 'broad'" (click)="setSensitivity('broad')">More results</button><button [class.selected]="sensitivity() === 'balanced'" (click)="setSensitivity('balanced')">Balanced</button><button [class.selected]="sensitivity() === 'strict'" (click)="setSensitivity('strict')">Higher confidence</button></div></section>
+          <div class="action-row"><div class="ready-copy"><span class="ready-indicator" [class.ready]="!!referenceFile() && photoCount() > 0"></span><span>{{ referenceFile() && photoCount() > 0 ? 'Ready to start a local search' : 'Add a reference photo and collection to continue' }}</span></div><button class="primary-button" [disabled]="!referenceFile() || photoCount() === 0 || isWorking()" (click)="createSearch()">{{ isWorking() ? 'Preparing…' : 'Find my photos' }} <span>↗</span></button></div>
+        </section>
+      } @else if (view() === 'reference-choice') {
+        <section class="screen-card"><div class="card-index">01</div><h2>Which face should we find?</h2><p>We found more than one face in the reference photo. Select the right one before uploading your collection.</p><div class="candidate-grid">@for (candidate of referenceCandidates(); track candidate.id) { <button class="candidate" (click)="selectReference(candidate)"><img [src]="imageUrl(candidate.previewUrl)" alt="Reference face candidate"><span>Use this face</span></button> }</div></section>
+      } @else if (view() === 'uploading') {
+        <section class="screen-card progress-card"><span class="card-index">UPLOAD</span><h2>Copying images to the local scanner</h2><p>{{ photoCount() | number }} selected images are uploading in small resumable batches.</p><div class="progress-track"><i [style.width.%]="uploadPercent()"></i></div><strong>{{ uploadPercent() }}%</strong><small>Nothing is sent to a cloud service.</small></section>
+      } @else if (view() === 'progress') {
+        <section class="screen-card progress-card"><span class="card-index">SCAN</span><h2>Finding matches</h2><p>YuNet is locating faces and SFace is comparing them against your reference face.</p><div class="progress-track"><i [style.width.%]="progressPercent"></i></div><strong>{{ progressPercent }}% · {{ search()?.processedFiles | number }} of {{ search()?.expectedFiles | number }} images</strong><small>{{ search()?.matchedFiles | number }} possible matches so far · {{ selectedSensitivityLabel }}</small></section>
+      } @else if (view() === 'results') {
+        <section class="results-header"><div><div class="eyebrow"><span class="eyebrow-line"></span>REVIEW MATCHES</div><h2>{{ matches().length }} possible photos found</h2><p>Review each result before saving the collection. Matched full-size copies are stored locally.</p></div><button class="primary-button" (click)="saveCollection()">Save collection <span>↗</span></button></section>
+        @if (matches().length) { <section class="match-grid">@for (match of matches(); track match.id) { <article class="match-card" [class.rejected]="match.decision === 'rejected'"><div class="match-image"><img [src]="imageUrl(match.thumbnailUrl)" [alt]="match.sourceRelativePath"><span>{{ (match.similarity * 100) | number:'1.0-0' }}%</span></div><div class="match-copy"><strong>{{ match.sourceRelativePath }}</strong><small>{{ match.decision === 'undecided' ? 'Awaiting review' : match.decision }}</small></div><div class="match-actions"><button [class.selected]="match.decision === 'accepted'" (click)="setMatchDecision(match, 'accepted')">Keep</button><button [class.selected]="match.decision === 'rejected'" (click)="setMatchDecision(match, 'rejected')">Remove</button><a [href]="imageUrl(match.imageUrl)" target="_blank">Open</a></div></article> }</section> } @else { <section class="screen-card"><h2>No matches met this threshold.</h2><p>Try a new reference image or run another search with “More results”.</p></section> }
+      }
+      } @else {
+        <section class="section-heading">
+          <div class="eyebrow"><span class="eyebrow-line"></span>YOUR LOCAL PHOTO LIBRARY</div>
+          <h1>{{ activeSection() === 'Collections' ? 'Saved collections.' : 'Recent activity.' }}</h1>
+          <p class="intro">{{ activeSection() === 'Collections' ? 'Open a saved result set or remove it and its retained files.' : 'Review searches run in this local workspace and reopen completed results.' }}</p>
+        </section>
+        @if (recordsLoading()) {
+          <section class="screen-card records-state"><h2>Loading {{ activeSection().toLowerCase() }}…</h2></section>
+        } @else if (records().length) {
+          <section class="record-list" [attr.aria-label]="activeSection()">
+            @for (record of records(); track record.id) {
+              <article class="record-row">
+                <button class="record-open" (click)="openRecord(record)">
+                  <span class="record-icon">{{ record.status === 'saved' ? '▤' : '◷' }}</span>
+                  <span class="record-copy"><strong>{{ record.collectionName || 'Photo search' }}</strong><small>{{ record.expectedFiles | number }} images · {{ record.matchedFiles | number }} matches · {{ record.status.replaceAll('_', ' ') }}</small></span>
+                  <time>{{ recordDate(record) | date:'medium' }}</time>
+                </button>
+                <button class="record-delete" aria-label="Delete search" title="Delete search and retained files" (click)="deleteRecord($event, record)">Delete</button>
+              </article>
+            }
+          </section>
+        } @else {
+          <section class="screen-card records-state">
+            <span class="card-index">{{ activeSection() === 'Collections' ? 'EMPTY' : 'NEW' }}</span>
+            <h2>{{ activeSection() === 'Collections' ? 'No saved collections yet.' : 'No searches yet.' }}</h2>
+            <p>{{ activeSection() === 'Collections' ? 'Finish a search and save its results to see the collection here.' : 'Your searches will appear here after you run one.' }}</p>
+            <button class="primary-button" (click)="navigate('Search')">Start a photo search <span>↗</span></button>
+          </section>
+        }
+      }
+
+      @if (notice()) { <div class="notice" role="status"><span>ⓘ</span>{{ notice() }}</div> }
+      <div class="fine-print"><span>♧</span>Only search images you have the right to use. Face matching can make mistakes — review results before saving.</div>
+      <footer class="page-footer"><span>Made for the moments that matter.</span><div><a href="#privacy">Privacy</a><a href="#guide">How it works</a><span>© 2026 frame.</span></div></footer>
+    </div>
+  </main>
+</div>
