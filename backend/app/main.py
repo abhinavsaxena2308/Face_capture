@@ -264,24 +264,47 @@ def get_search(search_id: uuid.UUID, session: DbSession) -> dict:
 
 
 @app.get("/api/v1/searches/{search_id}/matches")
-def list_matches(search_id: uuid.UUID, cursor: uuid.UUID | None = None, limit: int = 48, decision: MatchDecision | None = None, session: Session = Depends(get_session)) -> dict:
+def list_matches(
+    search_id: uuid.UUID,
+    cursor: uuid.UUID | None = None,
+    limit: int = 48,
+    decision: MatchDecision | None = None,
+    emotion: str | None = None,
+    session: Session = Depends(get_session)
+) -> dict:
     search = get_search_or_404(session, search_id)
     limit = max(1, min(limit, 100))
     query: Select = select(Match, Asset).join(Asset, Asset.id == Match.asset_id).where(Match.search_id == search.id)
     if decision:
         query = query.where(Match.decision == decision)
+    if emotion and emotion.lower() != "all":
+        query = query.where(func.coalesce(Match.emotion, 'neutral') == emotion.lower())
     if cursor:
         cursor_item = session.get(Match, cursor)
         if cursor_item:
             query = query.where(Match.created_at < cursor_item.created_at)
     rows = session.execute(query.order_by(Match.similarity.desc(), Match.created_at.desc()).limit(limit + 1)).all()
     page = rows[:limit]
+
+    # Compute emotion counts for filter badges
+    all_matches = session.execute(select(Match.emotion, Match.bbox).where(Match.search_id == search.id)).all()
+    counts: dict[str, int] = {"all": len(all_matches), "happy": 0, "neutral": 0, "surprised": 0, "sad": 0, "serious": 0}
+    for m_emotion, m_bbox in all_matches:
+        emo = m_emotion or (m_bbox.get("emotion") if isinstance(m_bbox, dict) else None) or "neutral"
+        emo_key = emo.lower()
+        counts[emo_key] = counts.get(emo_key, 0) + 1
+
+    def get_match_emotion(m: Match) -> str:
+        return getattr(m, "emotion", None) or (m.bbox.get("emotion") if isinstance(m.bbox, dict) else None) or "neutral"
+
     return {
         "items": [{
             "id": str(match.id), "assetId": str(asset.id), "sourceRelativePath": asset.source_relative_path,
-            "similarity": match.similarity, "bbox": match.bbox, "decision": match.decision.value,
+            "similarity": match.similarity, "bbox": match.bbox, "emotion": get_match_emotion(match),
+            "decision": match.decision.value,
             "thumbnailUrl": f"/api/v1/media/matches/{match.id}/thumbnail", "imageUrl": f"/api/v1/media/matches/{match.id}/image",
         } for match, asset in page],
+        "emotionCounts": counts,
         "nextCursor": str(page[-1][0].id) if len(rows) > limit else None,
     }
 

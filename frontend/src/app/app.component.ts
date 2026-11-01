@@ -6,6 +6,12 @@ import { ApiService, MatchItem, ReferenceFace, SearchInfo, Sensitivity } from '.
 type AppView = 'setup' | 'reference-choice' | 'uploading' | 'progress' | 'results';
 type Section = 'Search' | 'Collections' | 'Activity';
 
+export interface EmotionFilterOption {
+  key: string;
+  label: string;
+  icon: string;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
@@ -37,14 +43,29 @@ export class AppComponent implements OnDestroy {
   readonly workspaceMenuOpen = signal(false);
   readonly profileMenuOpen = signal(false);
   readonly helpOpen = signal(false);
+
+  // Emotion and Decision Filters
+  readonly selectedEmotion = signal<string>('all');
+  readonly selectedDecision = signal<string>('all');
+  readonly emotionCounts = signal<Record<string, number>>({});
+
+  readonly emotionFilters: EmotionFilterOption[] = [
+    { key: 'all', label: 'All Emotions', icon: '✨' },
+    { key: 'happy', label: 'Happy / Smiling', icon: '😊' },
+    { key: 'neutral', label: 'Neutral', icon: '😐' },
+    { key: 'surprised', label: 'Surprised', icon: '😲' },
+    { key: 'serious', label: 'Serious', icon: '🤔' },
+    { key: 'sad', label: 'Sad', icon: '😔' },
+  ];
+
   private objectUrl: string | null = null;
   private pollTimer: number | null = null;
 
   get sizeLabel(): string {
     const bytes = this.totalBytes();
-    if (bytes === 0) return 'No images selected yet';
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB selected`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB selected`;
+    if (bytes === 0) return '0 MB';
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   get selectedSensitivityLabel(): string {
@@ -54,7 +75,18 @@ export class AppComponent implements OnDestroy {
   get progressPercent(): number {
     const current = this.search();
     if (!current?.expectedFiles) return 0;
-    return Math.min(100, Math.round(current.processedFiles / current.expectedFiles * 100));
+    return Math.min(100, Math.round((current.processedFiles / current.expectedFiles) * 100));
+  }
+
+  get filteredMatches(): MatchItem[] {
+    const emotion = this.selectedEmotion().toLowerCase();
+    const decision = this.selectedDecision();
+    return this.matches().filter(m => {
+      const matchEmotion = (m.emotion || m.bbox?.['emotion'] || 'neutral').toLowerCase();
+      const passesEmotion = emotion === 'all' || matchEmotion === emotion;
+      const passesDecision = decision === 'all' || m.decision === decision;
+      return passesEmotion && passesDecision;
+    });
   }
 
   openReferencePicker(): void { this.referenceInput?.nativeElement.click(); }
@@ -107,6 +139,48 @@ export class AppComponent implements OnDestroy {
   }
 
   setSensitivity(value: Sensitivity): void { this.sensitivity.set(value); }
+
+  setEmotionFilter(emotionKey: string): void {
+    this.selectedEmotion.set(emotionKey);
+  }
+
+  setDecisionFilter(decisionKey: string): void {
+    this.selectedDecision.set(decisionKey);
+  }
+
+  getEmotionMeta(emotion?: string): { label: string; icon: string; className: string } {
+    switch ((emotion || '').toLowerCase()) {
+      case 'happy':
+        return { label: 'Happy', icon: '😊', className: 'emotion-happy' };
+      case 'surprised':
+        return { label: 'Surprised', icon: '😲', className: 'emotion-surprised' };
+      case 'sad':
+        return { label: 'Sad', icon: '😔', className: 'emotion-sad' };
+      case 'serious':
+        return { label: 'Serious', icon: '🤔', className: 'emotion-serious' };
+      default:
+        return { label: 'Neutral', icon: '😐', className: 'emotion-neutral' };
+    }
+  }
+
+  getEmotionCount(key: string): number {
+    const counts = this.emotionCounts();
+    if (key === 'all') return counts['all'] ?? this.matches().length;
+    return counts[key.toLowerCase()] ?? 0;
+  }
+
+  private updateEmotionCounts(items: MatchItem[], apiCounts?: Record<string, number>): void {
+    if (apiCounts && Object.keys(apiCounts).length) {
+      this.emotionCounts.set(apiCounts);
+      return;
+    }
+    const counts: Record<string, number> = { all: items.length, happy: 0, neutral: 0, surprised: 0, sad: 0, serious: 0 };
+    for (const item of items) {
+      const emo = (item.emotion || item.bbox?.['emotion'] || 'neutral').toLowerCase();
+      counts[emo] = (counts[emo] || 0) + 1;
+    }
+    this.emotionCounts.set(counts);
+  }
 
   async createSearch(): Promise<void> {
     const reference = this.referenceFile();
@@ -191,6 +265,7 @@ export class AppComponent implements OnDestroy {
         this.stopPolling();
         const matches = await firstValueFrom(this.api.getMatches(current.id));
         this.matches.set(matches.items);
+        this.updateEmotionCounts(matches.items, matches.emotionCounts);
         this.view.set('results');
         this.notice.set(`${response.search.matchedFiles} possible matches are ready for review.`);
       } else if (response.search.status === 'failed') {
@@ -216,7 +291,8 @@ export class AppComponent implements OnDestroy {
     const current = this.search();
     if (!current) return;
     try {
-      const name = `Face matches ${new Date().toLocaleDateString()}`;
+      const defaultName = `Face matches ${new Date().toLocaleDateString()}`;
+      const name = window.prompt('Collection name:', defaultName) || defaultName;
       const response = await firstValueFrom(this.api.saveCollection(current.id, name));
       this.search.set(response.search);
       this.notice.set(`Saved as “${name}”.`);
@@ -259,6 +335,7 @@ export class AppComponent implements OnDestroy {
       if (response.search.status === 'reviewing' || response.search.status === 'saved') {
         const matches = await firstValueFrom(this.api.getMatches(record.id));
         this.matches.set(matches.items);
+        this.updateEmotionCounts(matches.items, matches.emotionCounts);
         this.view.set('results');
       } else if (response.search.status === 'queued' || response.search.status === 'scanning') {
         this.view.set('progress');

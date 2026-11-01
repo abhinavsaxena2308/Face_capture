@@ -120,6 +120,7 @@ class Match(Base):
     bbox: Mapped[dict] = mapped_column(JSONB, nullable=False)
     copy_path: Mapped[str] = mapped_column(String(500), nullable=False)
     thumbnail_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    emotion: Mapped[str | None] = mapped_column(String(32), nullable=True, default="neutral")
     decision: Mapped[MatchDecision] = mapped_column(
         Enum(MatchDecision, name="match_decision", values_callable=enum_values),
         nullable=False,

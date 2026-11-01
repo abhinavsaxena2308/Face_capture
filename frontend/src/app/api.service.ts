@@ -34,7 +34,8 @@ export interface MatchItem {
   assetId: string;
   sourceRelativePath: string;
   similarity: number;
-  bbox: Record<string, number>;
+  bbox: Record<string, any>;
+  emotion: string;
   decision: 'accepted' | 'rejected' | 'undecided';
   thumbnailUrl: string;
   imageUrl: string;
@@ -42,7 +43,7 @@ export interface MatchItem {
 
 interface SearchCreationResponse { search: SearchInfo; referenceFaces: ReferenceFace[]; }
 interface SearchResponse { search: SearchInfo; }
-interface MatchResponse { items: MatchItem[]; nextCursor: string | null; }
+export interface MatchResponse { items: MatchItem[]; emotionCounts?: Record<string, number>; nextCursor: string | null; }
 interface SearchListResponse { items: SearchInfo[]; }
 
 @Injectable({ providedIn: 'root' })
@@ -85,8 +86,12 @@ export class ApiService {
     return this.http.get<SearchResponse>(`${this.apiBaseUrl()}/searches/${searchId}`);
   }
 
-  getMatches(searchId: string): Observable<MatchResponse> {
-    return this.http.get<MatchResponse>(`${this.apiBaseUrl()}/searches/${searchId}/matches`);
+  getMatches(searchId: string, emotion?: string, decision?: string): Observable<MatchResponse> {
+    const params: string[] = [];
+    if (emotion && emotion !== 'all') params.push(`emotion=${encodeURIComponent(emotion)}`);
+    if (decision && decision !== 'all') params.push(`decision=${encodeURIComponent(decision)}`);
+    const query = params.length ? `?${params.join('&')}` : '';
+    return this.http.get<MatchResponse>(`${this.apiBaseUrl()}/searches/${searchId}/matches${query}`);
   }
 
   setDecision(matchId: string, decision: MatchItem['decision']): Observable<{ id: string; decision: MatchItem['decision'] }> {

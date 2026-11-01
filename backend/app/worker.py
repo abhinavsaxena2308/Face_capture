@@ -125,12 +125,14 @@ def create_matches_and_cleanup(session: Session, search: Search) -> None:
                 asset.error_message = "Temporary upload file was removed before result copy."
                 search.failed_files += 1
                 continue
+            emotion = (bbox.get("emotion") if isinstance(bbox, dict) else "neutral") or "neutral"
             match = Match(
                 id=match_id,
                 search_id=search.id,
                 asset_id=asset.id,
                 similarity=score,
                 bbox=bbox,
+                emotion=emotion,
                 copy_path=storage.copy_match(search.id, match_id, asset.ingest_path, asset.original_name),
                 thumbnail_path=storage.create_thumbnail(search.id, match_id, asset.ingest_path),
             )
