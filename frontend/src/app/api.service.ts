@@ -18,6 +18,7 @@ export interface SearchInfo {
   matchedFiles: number;
   failedFiles: number;
   collectionName: string | null;
+  targetEmotion?: string;
   errorMessage: string | null;
   createdAt?: string;
   completedAt?: string | null;
@@ -52,12 +53,19 @@ export class ApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  createSearch(reference: File, expectedFiles: number, expectedBytes: number, sensitivity: Sensitivity): Observable<SearchCreationResponse> {
+  createSearch(
+    reference: File,
+    expectedFiles: number,
+    expectedBytes: number,
+    sensitivity: Sensitivity,
+    targetEmotion: string = 'all'
+  ): Observable<SearchCreationResponse> {
     const body = new FormData();
     body.append('reference', reference);
     body.append('expected_files', String(expectedFiles));
     body.append('expected_bytes', String(expectedBytes));
     body.append('sensitivity', sensitivity);
+    body.append('target_emotion', targetEmotion);
     return this.http.post<SearchCreationResponse>(`${this.apiBaseUrl()}/searches`, body);
   }
 

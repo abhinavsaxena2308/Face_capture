@@ -8,7 +8,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.db import SessionLocal
+from app.db import SessionLocal, ensure_schema
 from app.models import Asset, AssetStatus, Face, Match, ReferenceFace, Search, SearchStatus
 from app.services.matching import cosine_scores
 from app.services.storage import StorageService
@@ -114,33 +114,45 @@ def create_matches_and_cleanup(session: Session, search: Search) -> None:
         asset.id: asset
         for asset in session.scalars(select(Asset).where(Asset.search_id == search.id)).all()
     }
+    target_emotion = (getattr(search, "target_emotion", "all") or "all").lower()
     for asset_id, (_, score, bbox) in best_by_asset.items():
         asset = assets.get(asset_id)
         if asset is None:
-            raise RuntimeError(f"Face record references missing asset {asset_id}.")
-        if score >= search.threshold:
-            match_id = uuid.uuid4()
-            if not asset.ingest_path:
-                asset.status = AssetStatus.FAILED
-                asset.error_message = "Temporary upload file was removed before result copy."
-                search.failed_files += 1
-                continue
-            emotion = (bbox.get("emotion") if isinstance(bbox, dict) else "neutral") or "neutral"
-            match = Match(
-                id=match_id,
-                search_id=search.id,
-                asset_id=asset.id,
-                similarity=score,
-                bbox=bbox,
-                emotion=emotion,
-                copy_path=storage.copy_match(search.id, match_id, asset.ingest_path, asset.original_name),
-                thumbnail_path=storage.create_thumbnail(search.id, match_id, asset.ingest_path),
+          raise RuntimeError(f"Face record references missing asset {asset_id}.")
+        emotion = (
+            bbox.get("emotion") if isinstance(bbox, dict) else "neutral"
+        ) or "neutral"
+        emotion_matches = (
+            target_emotion == "all" or emotion.lower() == target_emotion
+        )
+        if score >= search.threshold and emotion_matches:
+          match_id = uuid.uuid4()
+          if not asset.ingest_path:
+            asset.status = AssetStatus.FAILED
+            asset.error_message = (
+                "Temporary upload file was removed before result copy."
             )
-            session.add(match)
-            asset.status = AssetStatus.MATCHED
-            search.matched_files += 1
+            search.failed_files += 1
+            continue
+          match = Match(
+              id=match_id,
+              search_id=search.id,
+              asset_id=asset.id,
+              similarity=score,
+              bbox=bbox,
+              emotion=emotion,
+              copy_path=storage.copy_match(
+                  search.id, match_id, asset.ingest_path, asset.original_name
+              ),
+              thumbnail_path=storage.create_thumbnail(
+                  search.id, match_id, asset.ingest_path
+              ),
+          )
+          session.add(match)
+          asset.status = AssetStatus.MATCHED
+          search.matched_files += 1
         else:
-            asset.status = AssetStatus.NOT_MATCHED
+          asset.status = AssetStatus.NOT_MATCHED
 
     # Face vectors were needed only for this search. Results retain score and box, not the target biometric vectors.
     session.execute(delete(Face).where(Face.search_id == search.id))
@@ -171,6 +183,7 @@ def process_search(search_id: uuid.UUID, vision: VisionService) -> None:
 
 def run() -> None:
     settings.ensure_directories()
+    ensure_schema()
     vision = VisionService(settings)
     while True:
         with SessionLocal() as session:

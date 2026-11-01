@@ -60,6 +60,7 @@ class Search(Base):
     collection_name: Mapped[str | None] = mapped_column(String(120))
     model_name: Mapped[str] = mapped_column(String(80), nullable=False, default="YuNet + SFace")
     model_version: Mapped[str] = mapped_column(String(80), nullable=False, default="2023mar / 2021dec")
+    target_emotion: Mapped[str | None] = mapped_column(String(32), nullable=True, default="all")
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

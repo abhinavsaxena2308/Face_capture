@@ -45,6 +45,7 @@ export class AppComponent implements OnDestroy {
   readonly helpOpen = signal(false);
 
   // Emotion and Decision Filters
+  readonly targetEmotion = signal<string>('all');
   readonly selectedEmotion = signal<string>('all');
   readonly selectedDecision = signal<string>('all');
   readonly emotionCounts = signal<Record<string, number>>({});
@@ -140,6 +141,10 @@ export class AppComponent implements OnDestroy {
 
   setSensitivity(value: Sensitivity): void { this.sensitivity.set(value); }
 
+  setTargetEmotion(emotionKey: string): void {
+    this.targetEmotion.set(emotionKey);
+  }
+
   setEmotionFilter(emotionKey: string): void {
     this.selectedEmotion.set(emotionKey);
   }
@@ -189,7 +194,7 @@ export class AppComponent implements OnDestroy {
     this.isWorking.set(true);
     this.notice.set('Checking your reference photo locally…');
     try {
-      const response = await firstValueFrom(this.api.createSearch(reference, files.length, this.totalBytes(), this.sensitivity()));
+      const response = await firstValueFrom(this.api.createSearch(reference, files.length, this.totalBytes(), this.sensitivity(), this.targetEmotion()));
       this.search.set(response.search);
       this.referenceCandidates.set(response.referenceFaces);
       if (response.referenceFaces.length === 1) {
@@ -263,6 +268,9 @@ export class AppComponent implements OnDestroy {
       this.search.set(response.search);
       if (response.search.status === 'reviewing' || response.search.status === 'saved') {
         this.stopPolling();
+        if (response.search.targetEmotion) {
+          this.selectedEmotion.set(response.search.targetEmotion);
+        }
         const matches = await firstValueFrom(this.api.getMatches(current.id));
         this.matches.set(matches.items);
         this.updateEmotionCounts(matches.items, matches.emotionCounts);

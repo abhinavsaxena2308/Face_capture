@@ -173,6 +173,78 @@
             </div>
           </div>
 
+          <!-- Step 3: Target Emotion Selection (Before Search) -->
+          <div class="emotion-setup-card">
+            <div class="settings-header">
+              <div class="settings-title-group">
+                <div class="title-with-badge">
+                  <span class="step-badge">3</span>
+                  <h2>Choose Target Emotion (Expression)</h2>
+                </div>
+                <p>Select which emotion to search for before starting (or search all emotions)</p>
+              </div>
+              @if (targetEmotion() !== 'all') {
+                <button class="btn-reset-emotion" (click)="setTargetEmotion('all')">Reset to All</button>
+              }
+            </div>
+
+            <div class="emotion-selection-grid">
+              <button class="emotion-choice-btn" [class.selected]="targetEmotion() === 'all'" (click)="setTargetEmotion('all')">
+                <span class="choice-icon">✨</span>
+                <div class="choice-text">
+                  <strong>All Emotions</strong>
+                  <small>Find any expression</small>
+                </div>
+                @if (targetEmotion() === 'all') { <span class="choice-check">✓</span> }
+              </button>
+
+              <button class="emotion-choice-btn" [class.selected]="targetEmotion() === 'happy'" (click)="setTargetEmotion('happy')">
+                <span class="choice-icon">😊</span>
+                <div class="choice-text">
+                  <strong>Happy / Smiling</strong>
+                  <small>Only smiling photos</small>
+                </div>
+                @if (targetEmotion() === 'happy') { <span class="choice-check">✓</span> }
+              </button>
+
+              <button class="emotion-choice-btn" [class.selected]="targetEmotion() === 'neutral'" (click)="setTargetEmotion('neutral')">
+                <span class="choice-icon">😐</span>
+                <div class="choice-text">
+                  <strong>Neutral</strong>
+                  <small>Calm & natural</small>
+                </div>
+                @if (targetEmotion() === 'neutral') { <span class="choice-check">✓</span> }
+              </button>
+
+              <button class="emotion-choice-btn" [class.selected]="targetEmotion() === 'surprised'" (click)="setTargetEmotion('surprised')">
+                <span class="choice-icon">😲</span>
+                <div class="choice-text">
+                  <strong>Surprised</strong>
+                  <small>Excited / open mouth</small>
+                </div>
+                @if (targetEmotion() === 'surprised') { <span class="choice-check">✓</span> }
+              </button>
+
+              <button class="emotion-choice-btn" [class.selected]="targetEmotion() === 'serious'" (click)="setTargetEmotion('serious')">
+                <span class="choice-icon">🤔</span>
+                <div class="choice-text">
+                  <strong>Serious</strong>
+                  <small>Focused & quiet</small>
+                </div>
+                @if (targetEmotion() === 'serious') { <span class="choice-check">✓</span> }
+              </button>
+
+              <button class="emotion-choice-btn" [class.selected]="targetEmotion() === 'sad'" (click)="setTargetEmotion('sad')">
+                <span class="choice-icon">😔</span>
+                <div class="choice-text">
+                  <strong>Sad</strong>
+                  <small>Melancholic expression</small>
+                </div>
+                @if (targetEmotion() === 'sad') { <span class="choice-check">✓</span> }
+              </button>
+            </div>
+          </div>
+
           <!-- Sensitivity & Configuration Card -->
           <div class="settings-card">
             <div class="settings-label">
@@ -203,11 +275,18 @@
           <div class="action-footer">
             <div class="status-summary">
               <span class="status-dot" [class.ready]="!!referenceFile() && photoCount() > 0"></span>
-              <span>
-                {{ referenceFile() && photoCount() > 0
-                  ? 'Ready to scan ' + (photoCount() | number) + ' photos'
-                  : 'Add a reference photo and folder to begin' }}
-              </span>
+              <div>
+                <strong>
+                  {{ referenceFile() && photoCount() > 0
+                    ? 'Ready to scan ' + (photoCount() | number) + ' photos'
+                    : 'Add a reference photo and folder to begin' }}
+                </strong>
+                @if (referenceFile() && photoCount() > 0) {
+                  <div class="target-emotion-tag">
+                    Target Emotion: <span class="tag-pill">{{ targetEmotion() === 'all' ? '✨ All Emotions' : getEmotionMeta(targetEmotion()).icon + ' ' + getEmotionMeta(targetEmotion()).label }}</span>
+                  </div>
+                }
+              </div>
             </div>
 
             <button class="btn-primary" [disabled]="!referenceFile() || photoCount() === 0 || isWorking()" (click)="createSearch()">

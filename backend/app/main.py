@@ -14,7 +14,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.db import get_session
+from app.db import ensure_schema, get_session
 from app.models import Asset, AssetStatus, Match, MatchDecision, ReferenceFace, Search, SearchStatus, UploadBatch
 from app.schemas import MatchDecisionUpdate, ReferenceFaceSelection, SaveCollectionRequest
 from app.services.storage import StorageService
@@ -25,6 +25,7 @@ from app.services.vision import VisionService
 async def lifespan(app: FastAPI):
     settings = get_settings()
     settings.ensure_directories()
+    ensure_schema()
     app.state.storage = StorageService(settings)
     app.state.vision = None
     yield
@@ -66,6 +67,7 @@ def serialize_search(search: Search) -> dict:
         "matchedFiles": search.matched_files,
         "failedFiles": search.failed_files,
         "collectionName": search.collection_name,
+        "targetEmotion": getattr(search, "target_emotion", "all") or "all",
         "errorMessage": search.error_message,
         "createdAt": search.created_at,
         "completedAt": search.completed_at,
@@ -101,6 +103,7 @@ async def create_search(
     expected_files: Annotated[int, Form(...)],
     expected_bytes: Annotated[int, Form(...)],
     sensitivity: Annotated[Literal["broad", "balanced", "strict"], Form()] = "balanced",
+    target_emotion: Annotated[str, Form()] = "all",
     session: Session = Depends(get_session),
 ) -> dict:
     if expected_files < 1 or expected_files > settings.max_collection_files:
@@ -135,6 +138,7 @@ async def create_search(
         threshold=settings.threshold_for(sensitivity),
         expected_files=expected_files,
         expected_bytes=expected_bytes,
+        target_emotion=target_emotion.lower() if target_emotion else "all",
     )
     session.add(search)
     session.flush()
